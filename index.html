@@ -135,7 +135,7 @@ function createReflTexture() {
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   
-  // Sky/ground gradient reflection
+  /*  Sky/ground gradient reflection */
   const grad = ctx.createLinearGradient(0, 0, 0, 128);
   grad.addColorStop(0, '#ffffff');    // Top sky light
   grad.addColorStop(0.3, '#dddddd');
@@ -188,7 +188,7 @@ const underLight = new THREE.PointLight(0x8c75a4, 2.0, 6);
 underLight.position.set(0, -0.2, 0);
 scene.add(underLight);
 
-/* ── Car Paint & Materials Configuration ── */
+/*Car Paint & Materials Configuration */
 const bodyMaterial = new THREE.MeshPhysicalMaterial({
   color: new THREE.Color('#b5a5c9'), // Default Lavender
   metalness: 0.85,
@@ -315,12 +315,14 @@ loader.load(
   (gltf) => {
     const modelScene = gltf.scene;
     
-    // Scale and center dynamically using Bounding Box
+    /* -- Scale and center dynamically using Bounding Box -- */
+  
     const box = new THREE.Box3().setFromObject(modelScene);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     
-    // Check orientation (if length is along Y axis, rotate it flat)
+    
+    /* --Check orientation (if length is along Y axis, rotate it flat) -- */
     if (size.y > size.z && size.y > size.x) {
       modelScene.rotation.x = -Math.PI / 2;
     }
@@ -371,7 +373,7 @@ loader.load(
     
     carGroup.add(modelScene);
     
-    // Fade out loader
+    /* -- Fade out loader --*/
     loaderBar.style.width = '100%';
     setTimeout(() => {
       loaderEl.classList.add('fade');
@@ -400,7 +402,7 @@ loader.load(
   }
 );
 
-/* ── Ambient dust particles ── */
+/* -- Ambient dust particles -- */
 const partCount = 100;
 const partGeo = new THREE.BufferGeometry();
 const pos = new Float32Array(partCount * 3);
