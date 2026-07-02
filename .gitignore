@@ -1,0 +1,8 @@
+.system_generated/
+*.log
+inspect_materials.py
+check_model_bounds.py
+download_draco.py
+check_draco.py
+inspect_glb.py
+dump_hierarchy.py

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PORSCHE – DRIVEN BY INSTINCT</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="theme-0">
+
+<!-- Loader -->
+<div id="loader">
+  <div class="loader-text">Loading 3D Experience</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<!-- Custom cursor -->
+<div id="cursor"></div>
+<div id="cursor-dot"></div>
+
+<!-- Hero -->
+<div id="hero">
+  <div class="headline">
+    <span>DRIVEN</span>
+    <span>BY <span class="accent" id="accent-text">INSTINCT</span></span>
+  </div>
+
+  <div class="info-block">
+    <div class="year-tag" id="model-year">Porsche 2026</div>
+    <div class="model-spec" id="model-name">911 LILAC CONCEPT</div>
+  </div>
+
+  <div class="model-nav">
+    <div class="model-dot active" data-model="0" title="Lilac Concept"></div>
+    <div class="model-dot" data-model="1" title="Liquid Chrome"></div>
+    <div class="model-dot" data-model="2" title="Guards Red"></div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+  </div>
+
+  <div class="drag-hint" id="drag-hint">
+    <span class="drag-arrow">←</span> Drag to rotate 3D model <span class="drag-arrow">→</span>
+  </div>
+
+  <div class="body-copy" id="body-copy">
+    Pure performance.<br>
+    Crafted for those who feel the road,<br>
+    not just drive it. Since 1948.
+  </div>
+
+  <div class="cta-circle" id="cta">
+    <div class="cta-label">Explore<br>Now</div>
+  </div>
+
+  <div class="stripe"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+/* ── Custom cursor ── */
+const cursorEl = document.getElementById('cursor');
+const dotEl    = document.getElementById('cursor-dot');
+let mx = 0, my = 0, cx = 0, cy = 0;
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX;
+  my = e.clientY;
+});
+
+const hoverEls = document.querySelectorAll('.cta-circle, .model-dot');
+hoverEls.forEach(el => {
+  el.addEventListener('mouseenter', () => cursorEl.classList.add('hover'));
+  el.addEventListener('mouseleave', () => cursorEl.classList.remove('hover'));
+});
+
+function animCursor() {
+  cx += (mx - cx) * 0.15;
+  cy += (my - cy) * 0.15;
+  cursorEl.style.left = cx + 'px';
+  cursorEl.style.top  = cy + 'px';
+  dotEl.style.left    = mx + 'px';
+  dotEl.style.top     = my + 'px';
+  requestAnimationFrame(animCursor);
+}
+animCursor();
+
+/* ── Scene Setup ── */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+
+// Setup Fog
+scene.fog = new THREE.FogExp2('#ded8e2', 0.015);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(0, 1.2, 6.2);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.enableZoom = false;
+controls.minPolarAngle = Math.PI * 0.3;
+controls.maxPolarAngle = Math.PI * 0.52;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.8;
+controls.target.set(0, 0.2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.update();
+
+/* ── Procedural Environment Reflection Map ── */
+function createReflTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  
+  // Sky/ground gradient reflection
+  const grad = ctx.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0, '#ffffff');    // Top sky light
+  grad.addColorStop(0.3, '#dddddd');
+  grad.addColorStop(0.5, '#444444');  // Horizon line
+  grad.addColorStop(0.7, '#222222');
+  grad.addColorStop(1, '#080808');    // Floor reflection
+  
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  
+  // Add some vertical lights to simulate studio softboxes
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(20, 0, 15, 128);
+  ctx.fillRect(80, 0, 25, 128);
+  
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+scene.environment = createReflTexture();
+
+/* ── Lighting ── */
+const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambient);
+
+const key = new THREE.DirectionalLight(0xffffff, 2.5);
+key.position.set(6, 8, 4);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 0.5;
+key.shadow.camera.far = 20;
+key.shadow.camera.left = -4;
+key.shadow.camera.right = 4;
+key.shadow.camera.top = 4;
+key.shadow.camera.bottom = -4;
+key.shadow.bias = -0.0005;
+scene.add(key);
+
+const fill = new THREE.DirectionalLight(0xffffff, 1.2);
+fill.position.set(-6, 4, -2);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0xffffff, 1.8);
+rim.position.set(0, 4, -6);
+scene.add(rim);
+
+// Soft glow light under the car
+const underLight = new THREE.PointLight(0x8c75a4, 2.0, 6);
+underLight.position.set(0, -0.2, 0);
+scene.add(underLight);
+
+/* ── Car Paint & Materials Configuration ── */
+const bodyMaterial = new THREE.MeshPhysicalMaterial({
+  color: new THREE.Color('#b5a5c9'), // Default Lavender
+  metalness: 0.85,
+  roughness: 0.15,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.05,
+  envMapIntensity: 2.2
+});
+
+const glassMaterial = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.35,
+  roughness: 0.05,
+  metalness: 0.1,
+  transmission: 0.9,
+  ior: 1.5,
+  thickness: 0.5
+});
+
+const tireMaterial = new THREE.MeshStandardMaterial({
+  color: 0x1a1a1a,
+  roughness: 0.85,
+  metalness: 0.05
+});
+
+const rimMaterial = new THREE.MeshStandardMaterial({
+  color: 0xdcdcdc,
+  roughness: 0.25,
+  metalness: 0.9
+});
+
+const blackTrimMaterial = new THREE.MeshStandardMaterial({
+  color: 0x181818,
+  roughness: 0.55,
+  metalness: 0.1
+});
+
+const interiorMaterial = new THREE.MeshStandardMaterial({
+  color: 0x242424,
+  roughness: 0.5,
+  metalness: 0.1
+});
+
+const chromeMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  roughness: 0.05,
+  metalness: 0.95
+});
+
+const redLightMaterial = new THREE.MeshStandardMaterial({
+  color: 0xd42b2b,
+  roughness: 0.15,
+  metalness: 0.5
+});
+
+const orangeLightMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffa500,
+  roughness: 0.15,
+  metalness: 0.5
+});
+
+/* ── Model Configurator States ── */
+const models = [
+  {
+    color: '#b5a5c9', // Lavender / Lilac
+    underLightColor: '#8c75a4',
+    fogColor: '#ded8e2',
+    name: '911 LILAC CONCEPT',
+    year: 'Porsche 2026',
+    copy: 'Pure performance.<br>Crafted for those who feel the road,<br>not just drive it. Since 1948.'
+  },
+  {
+    color: '#8a8d91', // Liquid Chrome / Grey Metallic
+    underLightColor: '#0077ff',
+    fogColor: '#111215',
+    name: '911 LIQUID CHROME',
+    year: 'Porsche 2026',
+    copy: 'Modern heritage.<br>Formed by wind, sculpted by light.<br>An icon re-engineered for tomorrow.'
+  },
+  {
+    color: '#d42b2b', // Guards Red
+    underLightColor: '#e8f060',
+    fogColor: '#E8F060',
+    name: '911 GT SPEED',
+    year: 'Porsche 2026',
+    copy: 'Driven by instinct.<br>Uncompromising power. Standard-bearing agility.<br>Designed to challenge limits.'
+  }
+];
+
+let activeModelIdx = 0;
+let targetBodyColor = new THREE.Color(models[0].color);
+let targetUnderLightColor = new THREE.Color(models[0].underLightColor);
+let targetFogColor = new THREE.Color(models[0].fogColor);
+
+/* ── Ground Plane (for shadows) ── */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 30),
+  new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.9,
+    metalness: 0.0
+  })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.3;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ── Car Loading ── */
+const carGroup = new THREE.Group();
+scene.add(carGroup);
+
+const loader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('./draco/');
+loader.setDRACOLoader(dracoLoader);
+
+const loaderBar = document.getElementById('loader-bar');
+const loaderEl = document.getElementById('loader');
+
+loader.load(
+  'porsche.glb',
+  (gltf) => {
+    const modelScene = gltf.scene;
+    
+    // Scale and center dynamically using Bounding Box
+    const box = new THREE.Box3().setFromObject(modelScene);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    
+    // Check orientation (if length is along Y axis, rotate it flat)
+    if (size.y > size.z && size.y > size.x) {
+      modelScene.rotation.x = -Math.PI / 2;
+    }
+    
+    // Recompute box after potential rotation
+    const rotBox = new THREE.Box3().setFromObject(modelScene);
+    const rotSize = rotBox.getSize(new THREE.Vector3());
+    const rotCenter = rotBox.getCenter(new THREE.Vector3());
+    
+    // Align center horizontally, and align bottom with the floor (-0.3)
+    modelScene.position.x = -rotCenter.x;
+    modelScene.position.z = -rotCenter.z;
+    modelScene.position.y = -rotBox.min.y - 0.3;
+    
+    // Normalize size so maximum dimension is 4.8 units
+    const maxDim = Math.max(rotSize.x, rotSize.y, rotSize.z);
+    const scaleFactor = 4.8 / maxDim;
+    modelScene.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    
+    modelScene.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        if (child.material) {
+          const matName = child.material.name.toLowerCase();
+          
+          if (matName.includes("carpaint")) {
+            child.material = bodyMaterial;
+          } else if (matName.includes("glass")) {
+            child.material = glassMaterial;
+          } else if (matName.includes("wheels_chrome") || matName.includes("wheel_chrome") || matName.includes("rim")) {
+            child.material = rimMaterial;
+          } else if (matName.includes("tire") || matName.includes("rubber") || matName.includes("992.001")) {
+            child.material = tireMaterial;
+          } else if (matName.includes("plastic") || matName.includes("black") || matName.includes("carbon")) {
+            child.material = blackTrimMaterial;
+          } else if (matName.includes("red") || matName.includes("taillight") || matName.includes("brakelight")) {
+            child.material = redLightMaterial;
+          } else if (matName.includes("interior") || matName.includes("leather") || matName.includes("carpet") || matName.includes("seat")) {
+            child.material = interiorMaterial;
+          } else if (matName.includes("chrome") || matName.includes("metal")) {
+            child.material = chromeMaterial;
+          }
+        }
+      }
+    });
+    
+    carGroup.add(modelScene);
+    
+    // Fade out loader
+    loaderBar.style.width = '100%';
+    setTimeout(() => {
+      loaderEl.classList.add('fade');
+      setTimeout(() => {
+        loaderEl.style.display = 'none';
+      }, 600);
+    }, 400);
+  },
+  (xhr) => {
+    if (xhr.total) {
+      const progress = (xhr.loaded / xhr.total) * 100;
+      loaderBar.style.width = Math.min(progress, 98) + '%';
+    }
+  },
+  (error) => {
+    console.error('An error happened loading the 3D model:', error);
+    // Fallback: create a basic box if loading fails entirely
+    const fallbackBox = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 1, 1.5),
+      bodyMaterial
+    );
+    fallbackBox.position.set(0, 0.2, 0);
+    carGroup.add(fallbackBox);
+    loaderEl.classList.add('fade');
+    setTimeout(() => { loaderEl.style.display = 'none'; }, 600);
+  }
+);
+
+/* ── Ambient dust particles ── */
+const partCount = 100;
+const partGeo = new THREE.BufferGeometry();
+const pos = new Float32Array(partCount * 3);
+for (let i = 0; i < partCount; i++) {
+  pos[i*3]   = (Math.random()-0.5) * 12;
+  pos[i*3+1] = Math.random() * 4;
+  pos[i*3+2] = (Math.random()-0.5) * 8;
+}
+partGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+const partMat = new THREE.PointsMaterial({
+  color: 0xffffff,
+  size: 0.02,
+  transparent: true,
+  opacity: 0.15
+});
+const particles = new THREE.Points(partGeo, partMat);
+scene.add(particles);
+
+/* ── Theme Switcher Interaction ── */
+const dots = document.querySelectorAll('.model-dot');
+const accentText = document.getElementById('accent-text');
+const modelName = document.getElementById('model-name');
+const modelYear = document.getElementById('model-year');
+const bodyCopy = document.getElementById('body-copy');
+
+dots.forEach((dot, index) => {
+  dot.addEventListener('click', () => {
+    if (activeModelIdx === index) return;
+    
+    // Update active dot visual
+    dots.forEach(d => d.classList.remove('active'));
+    dot.classList.add('active');
+    
+    activeModelIdx = index;
+    const modelData = models[index];
+    
+    // Set target colors for Three.js interpolation
+    targetBodyColor.set(modelData.color);
+    targetUnderLightColor.set(modelData.underLightColor);
+    targetFogColor.set(modelData.fogColor);
+    
+    // Update HTML theme class
+    document.body.className = `theme-${index}`;
+    
+    // Update text content
+    accentText.textContent = index === 2 ? 'SPEED' : (index === 1 ? 'HERITAGE' : 'INSTINCT');
+    modelName.textContent = modelData.name;
+    bodyCopy.innerHTML = modelData.copy;
+  });
+});
+
+/* ── Drag Hint hiding on interaction ── */
+const hintEl = document.getElementById('drag-hint');
+let dragged = false;
+
+renderer.domElement.addEventListener('pointerdown', () => {
+  if (!dragged) {
+    dragged = true;
+    hintEl.classList.add('hidden');
+  }
+  controls.autoRotate = false;
+});
+
+/* ── Resize Observer ── */
+const wrap = document.getElementById('canvas-wrap');
+const resize = () => {
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+};
+new ResizeObserver(resize).observe(wrap);
+resize();
+
+/* ── Animation Loop ── */
+const clock = new THREE.Clock();
+
+const animate = () => {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Subtle floating hover effect for the car
+  carGroup.position.y = Math.sin(t * 0.5) * 0.03;
+
+  // Slowly rotate wheels if they exist (conceptual)
+  // particles drift downwards
+  const ppos = partGeo.attributes.position.array;
+  for (let i = 0; i < partCount; i++) {
+    ppos[i*3+1] -= 0.002;
+    if (ppos[i*3+1] < -0.3) ppos[i*3+1] = 4;
+  }
+  partGeo.attributes.position.needsUpdate = true;
+
+  // Smooth color transitions using lerp
+  bodyMaterial.color.lerp(targetBodyColor, 0.08);
+  underLight.color.lerp(targetUnderLightColor, 0.08);
+  
+  const currentFogColor = scene.fog.color;
+  currentFogColor.lerp(targetFogColor, 0.08);
+  
+  // Set ground plane color to match fog color slightly for seamless horizon integration
+  ground.material.color.copy(currentFogColor);
+  
+  // Set particle color based on theme contrast (darker particles on light bg, lighter on dark)
+  if (activeModelIdx === 1) {
+    partMat.color.setHex(0xffffff);
+    partMat.opacity = 0.25;
+  } else {
+    partMat.color.setHex(0x000000);
+    partMat.opacity = 0.12;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+};
+animate();
+</script>
+</body>
+</html>
